@@ -1,0 +1,247 @@
+#!/bin/bash
+
+# about - a CLI Bash script to show system info
+
+# This script is inspired by ScreenFetch (https://github.com/KittyKatt/screenFetch)
+# and by Archey (https://github.com/djmelik/archey).
+
+# Copyright (C) 2017 Ducobu Alexandre <alexandre.ducobu@yahoo.be>
+
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+
+# test to see if bash supports arrays
+arraytest[0]='test' || (echo 'Error: Arrays are not supported in this version of
+bash.' && exit 2)
+
+
+# OS Version Detection - Begin
+function detectos() {
+    OSversion=$(sw_vers -productVersion)
+    buildVersion=$(sw_vers -buildVersion)
+    if [ "$(uname -m)" == "x86_64" ]; then
+        hardware='64 bits'
+    else
+        hardware='32 bits'
+    fi
+
+    OS="macOS $(sw_vers -productVersion) $(sw_vers -buildVersion) ${hardware}"
+}
+# OS Version Detection - End
+
+# Kernel Version Detection - Begin
+function detectkernel() {
+	kernel=( $(uname -srm) )
+	kernel="${kernel[${#kernel[@]}-1]} ${kernel[@]:0:${#kernel[@]}-1}"
+}
+# Kernel Version Detection - End
+
+# Uptime Detection - Begin
+function detectuptime() {
+	unset uptime
+	boot=$(sysctl -n kern.boottime | cut -d "=" -f 2 | cut -d "," -f 1)
+	now=$(date +%s)
+	uptime=$(($now-$boot))
+
+	secs=$((${uptime}%60))
+	mins=$((${uptime}/60%60))
+	hours=$((${uptime}/3600%24))
+	days=$((${uptime}/86400))
+	uptime="${mins}m"
+	if [ "${hours}" -ne "0" ]; then
+		uptime="${hours}h ${uptime}"
+	fi
+	if [ "${days}" -ne "0" ]; then
+		uptime="${days}d ${uptime}"
+	fi
+}
+# Uptime Detection - End
+
+# Package Count - Begin
+function detectpkgs() {
+	pkgs="Unknown"
+    if [ -d "/usr/local/bin" ]; then
+        loc_pkgs=$(ls -l /usr/local/bin/ | grep -v "\(../Cellar/\|brew\)" | wc -l)
+        pkgs=$((${loc_pkgs} -1));
+    fi
+
+    if type -p port >/dev/null 2>&1; then
+        port_pkgs=$(port installed 2>/dev/null | wc -l)
+        pkgs=$((${pkgs} + (${port_pkgs} -1)))
+    fi
+
+    if type -p brew >/dev/null 2>&1; then
+        brew_pkgs=$(brew list -1 2>/dev/null | wc -l)
+        pkgs=$((${pkgs} + ${brew_pkgs}))
+    fi
+}
+# Package Count - End
+
+# Shell Detection - Begin
+function detectshell_ver() {
+	local version_data='' version='' get_version='--version'
+
+	version_data="$( $1 $get_version 2>/dev/null )"
+
+	if [[ -n $version_data ]];then
+		version=$(awk '
+		BEGIN {
+			IGNORECASE=1
+		}
+		/'$2'/ {
+			gsub(/(,|v|V)/, "",$'$3')
+			if ($2 ~ /[Bb][Aa][Ss][Hh]/) {
+				gsub(/\(.*|-release|-version\)/,"",$4)
+			}
+			print $'$3'
+			exit # quit after first match prints
+		}' <<< "$version_data")
+	fi
+	echo "$version"
+}
+function detectshell() {
+	shell_type=$(ps -p $PPID -o args | tail -1)
+	shell_type=${shell_type/-}
+	shell_type=${shell_type//*\/}
+
+	case $shell_type in
+		bash)
+			shell_version_data=$( detectshell_ver "$shell_type" "^GNU.bash,.version" "4" )
+			;;
+		csh)
+			shell_version_data=$( detectshell_ver "$shell_type" "$shell_type" "3" )
+			;;
+		dash)
+			shell_version_data=$( detectshell_ver "$shell_type" "$shell_type" "3" )
+			;;
+		ksh)
+			shell_version_data=$( detectshell_ver "$shell_type" "version" "5" )
+			;;
+		tcsh)
+			shell_version_data=$( detectshell_ver "$shell_type" "^tcsh" "2" )
+			;;
+		zsh)
+			shell_version_data=$( detectshell_ver "$shell_type" "^zsh" "2" )
+			;;
+	esac
+
+	if [[ -n $shell_version_data ]];then
+		shell_type="$shell_type $shell_version_data"
+	fi
+
+	myShell=${shell_type}
+}
+# Shell Detection - End
+
+# Resolution Detection - Begin
+function detectres() {
+    xResolution=$(system_profiler SPDisplaysDataType | awk '/Resolution:/ {print $2"x"$4" "}')
+    if [[ "$(echo $xResolution | wc -l)" -ge 1 ]]; then
+        xResolution=$(echo $xResolution | tr "\\n" "," | sed 's/\(.*\),/\1/')
+    fi
+}
+# Resolution Detection - End
+
+# WindowsManager Theme Detection - BEGIN
+function detectwmtheme() {
+	Win_theme="Not Found"
+	themeNumber="$(defaults read NSGlobalDomain AppleAquaColorVariant 2>/dev/null)"
+	if [ "${themeNumber}" == "1" ] || [ "${themeNumber}x" == "x" ]; then
+		Win_theme="Blue"
+	else
+		Win_theme="Graphite"
+	fi
+}
+# WindowsManager Theme Detection - END
+
+# Memory Detection - Begin
+function detectmem() {
+	hw_mem=0
+	free_mem=0
+	human=1024
+    totalmem=$(echo "$(sysctl -n hw.memsize)"/${human}^2|bc)
+    wiredmem=$(vm_stat | grep wired | awk '{ print $4 }' | sed 's/\.//')
+    activemem=$(vm_stat | grep ' active' | awk '{ print $3 }' | sed 's/\.//')
+    compressedmem=$(vm_stat | grep occupied | awk '{ print $5 }' | sed 's/\.//')
+    usedmem=$(((${wiredmem} + ${activemem} + ${compressedmem}) * 4 / $human))
+    ram="${usedmem}MiB / ${totalmem}MiB"
+}
+# Memory Detection - End
+
+# System Variables
+user=$(whoami)
+hostname=$(hostname | sed 's/.local//g')
+detectos
+detectkernel
+detectuptime
+detectpkgs
+detectshell
+terminal="$TERM ${TERM_PROGRAM//_/ }"
+detectres
+DE="Aqua"
+WM="Quartz Compositor"
+detectwmtheme
+cpu=$(sysctl -n machdep.cpu.brand_string)
+gpu=$(system_profiler SPDisplaysDataType | awk -F': ' '/^\ *Chipset Model:/ {print $2}' | awk '{ printf "%s / ", $0 }' | sed -e 's/\/ $//g')
+detectmem
+
+# removes (R) and (TM) from the CPU name so it fits in a standard 80 window
+cpu=$(echo "$cpu" | awk '$1=$1' | sed 's/([A-Z]\{1,2\})//g')
+
+
+# Set up colors:
+
+RED=$(tput       setaf 1 2>/dev/null)
+GREEN=$(tput     setaf 2 2>/dev/null)
+YELLOW=$(tput    setaf 3 2>/dev/null)
+BLUE=$(tput      setaf 4 2>/dev/null)
+PURPLE=$(tput    setaf 5 2>/dev/null)
+textColor=$(tput setaf 6 2>/dev/null)
+normal=$(tput    sgr0 2>/dev/null)
+
+
+fieldlist[${#fieldlist[@]}]="${textColor}User:${normal} ${user}@${hostname}${normal}"
+fieldlist[${#fieldlist[@]}]="${textColor}OS:${normal} ${OS}${normal}"
+fieldlist[${#fieldlist[@]}]="${textColor}Kernel:${normal} ${kernel}${normal}"
+fieldlist[${#fieldlist[@]}]="${textColor}Uptime:${normal} ${uptime}${normal}"
+fieldlist[${#fieldlist[@]}]="${textColor}Packages:${normal} ${pkgs}${normal}"
+fieldlist[${#fieldlist[@]}]="${textColor}Shell:${normal} ${shell_type}${normal}"
+fieldlist[${#fieldlist[@]}]="${textColor}Terminal:${normal} ${terminal}${normal}"
+fieldlist[${#fieldlist[@]}]="${textColor}Resolution:${normal} ${xResolution}${normal}"
+fieldlist[${#fieldlist[@]}]="${textColor}DE:${normal} ${DE}${normal}"
+fieldlist[${#fieldlist[@]}]="${textColor}WM:${normal} ${WM}, ${Win_theme}${normal}"
+fieldlist[${#fieldlist[@]}]="${textColor}CPU:${normal} ${cpu}${normal}"
+fieldlist[${#fieldlist[@]}]="${textColor}GPU:${normal} ${gpu}${normal}"
+fieldlist[${#fieldlist[@]}]="${textColor}RAM:${normal} ${ram}${normal}"
+
+
+# The ${foo#  } is a cheat so that it lines up here as well
+# as when run.
+  echo -e "
+${GREEN#  }                                   ${fieldlist[0]}
+${GREEN#  }                                  ${fieldlist[1]}
+${GREEN#  }                                   ${fieldlist[2]}
+${GREEN#  }                        ${fieldlist[3]}
+${YELLOW# }                ${fieldlist[4]}
+${YELLOW# }                 ${fieldlist[5]}
+${RED#    }                  ${fieldlist[6]}
+${RED#    }                  ${fieldlist[7]}
+${RED#    }                 ${fieldlist[8]}
+${PURPLE# }                ${fieldlist[9]}
+${PURPLE# }                  ${fieldlist[10]}
+${BLUE#   }                      ${fieldlist[11]}
+${BLUE#   }                             ${fieldlist[12]}\
+${normal}
+"
+
