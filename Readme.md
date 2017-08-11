@@ -1,6 +1,6 @@
-#about - A CLI Bash Information Tool for macOS
+# about - A CLI Bash Information Tool for macOS
 
-##What is _about_ ?
+## What is _about_ ?
 
 **about** is a _Bash Information Tool_ which will display an ASCII Apple logo with some valuable information at its right.  
 This bash script lists the username, the OS and kernel versions, the used shell and terminal application as well as the CPU's and GPU's informations.
