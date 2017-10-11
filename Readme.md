@@ -2,7 +2,7 @@
 
 ## What is _about_ ?
 
-**about** is a _Bash Information Tool_ which will display an ASCII Apple logo with some valuable information at its right.  
+**about** is a _Bash Information Tool_ which will display an ASCII Apple logo with some valuable information about your OS at its right.  
 This bash script lists the username, the OS and kernel versions, the used shell and terminal application as well as the CPU's and GPU's informations.
 
 ![The about script](about.png "The about script")
