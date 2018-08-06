@@ -20,4 +20,4 @@ _This script is inspired by [ScreenFetch](https://github.com/KittyKatt/screenFet
 [type-badge]: https://badgen.net/badge//terminal?icon=terminal
 [type-url]: https://en.wikipedia.org/wiki/Terminal_(macOS)
 [license-badge]: https://badgen.net/badge/license/GPL-3.0/2AB77E
-[license-url]: https://github.com/Harchytekt/learnIT/blob/master/LICENSE
+[license-url]: https://github.com/Harchytekt/about/blob/master/LICENSE
