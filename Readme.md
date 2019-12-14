@@ -15,9 +15,9 @@ _This script is inspired by [ScreenFetch](https://github.com/KittyKatt/screenFet
 
 [version-badge]: https://badgen.net/github/release/Harchytekt/learnIT/stable
 [version-url]: https://github.com/Harchytekt/about/tree/v1.0
-[platform-badge]: https://badgen.net/badge//macOS?icon=apple
+[platform-badge]: https://badgen.net/badge/icon/macOS?icon=apple&label
 [platform-url]: https://www.apple.com/macos/
-[type-badge]: https://badgen.net/badge//terminal?icon=terminal
+[type-badge]: https://badgen.net/badge/icon/terminal?icon=terminal&label
 [type-url]: https://en.wikipedia.org/wiki/Terminal_(macOS)
 [license-badge]: https://badgen.net/badge/license/GPL-3.0/2AB77E
 [license-url]: https://github.com/Harchytekt/about/blob/master/LICENSE
