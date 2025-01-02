@@ -28,15 +28,18 @@ bash.' && exit 2)
 
 # OS Version Detection - Begin
 function detectos() {
-    OSversion=$(sw_vers -productVersion)
+    friendlyName=$(awk '/SOFTWARE LICENSE AGREEMENT FOR macOS/' '/System/Library/CoreServices/Setup Assistant.app/Contents/Resources/en.lproj/OSXSoftwareLicense.rtf' | awk -F 'macOS ' '{print $NF}' | awk '{print substr($0, 0, length($0)-1)}')
+    osVersion=$(sw_vers -productVersion)
     buildVersion=$(sw_vers -buildVersion)
-    if [ "$(uname -m)" == "x86_64" ]; then
+    if [ "$(uname -m)" == "arm64" ]; then
+        hardware='arm64'
+    elif [ "$(uname -m)" == "x86_64" ]; then
         hardware='64 bits'
     else
         hardware='32 bits'
     fi
 
-    OS="macOS $(sw_vers -productVersion) $(sw_vers -buildVersion) ${hardware}"
+    OS="macOS ${friendlyName} (${osVersion} ${buildVersion} ${hardware})"
 }
 # OS Version Detection - End
 
@@ -170,12 +173,11 @@ function detectmem() {
 	hw_mem=0
 	free_mem=0
 	human=1024
-    totalmem=$(echo "$(sysctl -n hw.memsize)"/${human}^2|bc)
+    totalRam=$(echo "$(sysctl -n hw.memsize)"/${human}^2|bc)
     wiredmem=$(vm_stat | grep wired | awk '{ print $4 }' | sed 's/\.//')
     activemem=$(vm_stat | grep ' active' | awk '{ print $3 }' | sed 's/\.//')
     compressedmem=$(vm_stat | grep occupied | awk '{ print $5 }' | sed 's/\.//')
-    usedmem=$(((${wiredmem} + ${activemem} + ${compressedmem}) * 4 / $human))
-    ram="${usedmem}MiB / ${totalmem}MiB"
+    usedRam=$(((${wiredmem} + ${activemem} + ${compressedmem}) * 4 / $human))
 }
 # Memory Detection - End
 
@@ -192,6 +194,8 @@ detectres
 DE="Aqua"
 WM="Quartz Compositor"
 detectwmtheme
+usedStorage=$(diskutil info / | grep "Container Free Space" | awk '{print $4, $5}')
+totalStorage=$(diskutil info / | grep "Disk Size" | awk '{print $3, $4}')
 cpu=$(sysctl -n machdep.cpu.brand_string)
 gpu=$(system_profiler SPDisplaysDataType | awk -F': ' '/^\ *Chipset Model:/ {print $2}' | awk '{ printf "%s / ", $0 }' | sed -e 's/\/ $//g')
 detectmem
@@ -221,9 +225,9 @@ fieldlist[${#fieldlist[@]}]="${textColor}Terminal:${normal} ${terminal}${normal}
 fieldlist[${#fieldlist[@]}]="${textColor}Resolution:${normal} ${xResolution}${normal}"
 fieldlist[${#fieldlist[@]}]="${textColor}DE:${normal} ${DE}${normal}"
 fieldlist[${#fieldlist[@]}]="${textColor}WM:${normal} ${WM}, ${Win_theme}${normal}"
-fieldlist[${#fieldlist[@]}]="${textColor}CPU:${normal} ${cpu}${normal}"
-fieldlist[${#fieldlist[@]}]="${textColor}GPU:${normal} ${gpu}${normal}"
-fieldlist[${#fieldlist[@]}]="${textColor}RAM:${normal} ${ram}${normal}"
+fieldlist[${#fieldlist[@]}]="${textColor}CPU:${normal} ${cpu}${normal} ${PURPLE}| ${textColor}GPU:${normal} ${gpu}${normal}"
+fieldlist[${#fieldlist[@]}]="${textColor}Storage:${normal} ${usedStorage} / ${totalStorage}${normal}"
+fieldlist[${#fieldlist[@]}]="${textColor}RAM:${normal} ${usedRam} MiB / ${totalRam} MiB${normal}"
 
 
 # The ${foo#  } is a cheat so that it lines up here as well
