@@ -4,6 +4,7 @@
 
 # This script is inspired by ScreenFetch (https://github.com/KittyKatt/screenFetch)
 # and by Archey (https://github.com/djmelik/archey).
+# Supports ZSH and Bash.
 
 # Copyright (C) 2017 Ducobu Alexandre <alexandre.ducobu@yahoo.be>
 
@@ -20,79 +21,59 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+detect_os_details() {
+  friendly_name=$(awk '/SOFTWARE LICENSE AGREEMENT FOR macOS/' '/System/Library/CoreServices/Setup Assistant.app/Contents/Resources/en.lproj/OSXSoftwareLicense.rtf' | awk -F 'macOS ' '{print $NF}' | awk '{print substr($0, 0, length($0)-1)}')
+  os_version=$(sw_vers -productVersion)
+  build_version=$(sw_vers -buildVersion)
+  hardware=$(uname -m)
+  
+  hardware_desc="Unknown"
+  case $hardware in
+    arm64) hardware_desc="ARM64" ;;
+    x86_64) hardware_desc="64-bit" ;;
+    i386) hardware_desc="32-bit" ;;
+  esac
 
-# test to see if bash supports arrays
-arraytest[0]='test' || (echo 'Error: Arrays are not supported in this version of
-bash.' && exit 2)
-
-
-# OS Version Detection - Begin
-function detect_os_details() {
-    friendlyName=$(awk '/SOFTWARE LICENSE AGREEMENT FOR macOS/' '/System/Library/CoreServices/Setup Assistant.app/Contents/Resources/en.lproj/OSXSoftwareLicense.rtf' | awk -F 'macOS ' '{print $NF}' | awk '{print substr($0, 0, length($0)-1)}')
-    osVersion=$(sw_vers -productVersion)
-    buildVersion=$(sw_vers -buildVersion)
-    if [ "$(uname -m)" == "arm64" ]; then
-        hardware='arm64'
-    elif [ "$(uname -m)" == "x86_64" ]; then
-        hardware='64 bits'
-    else
-        hardware='32 bits'
-    fi
-
-    OS="macOS ${friendlyName} (${osVersion} ${buildVersion} ${hardware})"
+  OS="macOS ${friendly_name} ${os_version} (${build_version}, ${hardware_desc})"
 }
-# OS Version Detection - End
 
-# Kernel Version Detection - Begin
-function detect_kernel_version() {
-    kernel=( $(uname -srm) )
-    kernel="${kernel[${#kernel[@]}-1]} ${kernel[@]:0:${#kernel[@]}-1}"
+detect_kernel_version() {
+  kernel="$(uname -srm)"
 }
-# Kernel Version Detection - End
 
-# Uptime Detection - Begin
-function detect_uptime() {
-    unset uptime
-    boot=$(sysctl -n kern.boottime | cut -d "=" -f 2 | cut -d "," -f 1)
-    now=$(date +%s)
-    uptime=$(($now-$boot))
+detect_uptime() {
+  boot_time=$(sysctl -n kern.boottime | awk -F'[ ,]' '{print $4}' | sed 's/}//')
+  now=$(date +%s)
 
-    secs=$((${uptime}%60))
-    mins=$((${uptime}/60%60))
-    hours=$((${uptime}/3600%24))
-    days=$((${uptime}/86400))
-    uptime="${mins}m"
-    if [ "${hours}" -ne "0" ]; then
-        uptime="${hours}h ${uptime}"
-    fi
-    if [ "${days}" -ne "0" ]; then
-        uptime="${days}d ${uptime}"
-    fi
+  if [[ -n $boot_time && -n $now ]]; then
+    uptime_sec=$((now - boot_time))
+    days=$((uptime_sec / 86400))
+    hours=$((uptime_sec % 86400 / 3600))
+    minutes=$((uptime_sec % 3600 / 60))
+    uptime="${days}d ${hours}h ${minutes}m"
+  else
+    uptime="Unknown"
+  fi
 }
-# Uptime Detection - End
 
-# Package Count - Begin
-function detect_packages() {
-    pkgs="Unknown"
-    if [ -d "/usr/local/bin" ]; then
-        loc_pkgs=$(ls -l /usr/local/bin/ | grep -v "\(../Cellar/\|brew\)" | wc -l)
-        pkgs=$((${loc_pkgs} -1));
-    fi
+detect_packages() {
+  packages=0
+  
+  if command -v brew >/dev/null 2>&1; then
+    brew_packages=$(brew list -1 2>/dev/null | wc -l)
+    ((packages += brew_packages))
+  fi
 
-    if type -p port >/dev/null 2>&1; then
-        port_pkgs=$(port installed 2>/dev/null | wc -l)
-        pkgs=$((${pkgs} + (${port_pkgs} -1)))
-    fi
+  if command -v port >/dev/null 2>&1; then
+    port_packages=$(port installed | wc -l)
+    ((packages += port_packages))
+  fi
 
-    if type -p brew >/dev/null 2>&1; then
-        brew_pkgs=$(brew list -1 2>/dev/null | wc -l)
-        pkgs=$((${pkgs} + ${brew_pkgs}))
-    fi
+  packages=${packages:-"Unknown"}
 }
-# Package Count - End
 
 # Shell Detection - Begin
-function detectshell_ver() {
+detect_shell_version() {
     local version_data='' version='' get_version='--version'
 
     version_data="$( $1 $get_version 2>/dev/null )"
@@ -100,7 +81,7 @@ function detectshell_ver() {
     if [[ -n $version_data ]];then
         version=$(awk '
         BEGIN {
-            IGNORECASE=1
+            IGNORE_CASE=1
         }
         /'$2'/ {
             gsub(/(,|v|V)/, "",$'$3')
@@ -113,29 +94,29 @@ function detectshell_ver() {
     fi
     echo "$version"
 }
-function detect_shell() {
+detect_shell() {
     shell_type=$(ps -p $PPID -o args | tail -1)
     shell_type=${shell_type/-}
     shell_type=${shell_type//*\/}
 
     case $shell_type in
         bash)
-            shell_version_data=$( detectshell_ver "$shell_type" "^GNU.bash,.version" "4" )
+            shell_version_data=$( detect_shell_version "$shell_type" "^GNU.bash,.version" "4" )
             ;;
         csh)
-            shell_version_data=$( detectshell_ver "$shell_type" "$shell_type" "3" )
+            shell_version_data=$( detect_shell_version "$shell_type" "$shell_type" "3" )
             ;;
         dash)
-            shell_version_data=$( detectshell_ver "$shell_type" "$shell_type" "3" )
+            shell_version_data=$( detect_shell_version "$shell_type" "$shell_type" "3" )
             ;;
         ksh)
-            shell_version_data=$( detectshell_ver "$shell_type" "version" "5" )
+            shell_version_data=$( detect_shell_version "$shell_type" "version" "5" )
             ;;
         tcsh)
-            shell_version_data=$( detectshell_ver "$shell_type" "^tcsh" "2" )
+            shell_version_data=$( detect_shell_version "$shell_type" "^tcsh" "2" )
             ;;
         zsh)
-            shell_version_data=$( detectshell_ver "$shell_type" "^zsh" "2" )
+            shell_version_data=$( detect_shell_version "$shell_type" "^zsh" "2" )
             ;;
     esac
 
@@ -143,68 +124,88 @@ function detect_shell() {
         shell_type="$shell_type $shell_version_data"
     fi
 
-    myShell=${shell_type}
+    shell=${shell_type}
+    terminal="$TERM ${TERM_PROGRAM//_/ }"
 }
 # Shell Detection - End
 
-# Resolution Detection - Begin
-function detect_resolution() {
-    xResolution=$(system_profiler SPDisplaysDataType | awk '/Resolution:/ {print $2"x"$4" "}')
-    if [[ "$(echo $xResolution | wc -l)" -ge 1 ]]; then
-        xResolution=$(echo $xResolution | tr "\\n" "," | sed 's/\(.*\),/\1/')
-    fi
+detect_resolution() {
+  resolution=$(system_profiler SPDisplaysDataType | awk '/Resolution:/ {print $2 "x" $4}')
+  resolution="${resolution:-Unknown}"
 }
-# Resolution Detection - End
 
-# WindowsManager Theme Detection - BEGIN
-function detect_window_manager_theme() {
-    Win_theme="Not Found"
-    themeNumber="$(defaults read NSGlobalDomain AppleAquaColorVariant 2>/dev/null)"
-    if [ "${themeNumber}" == "1" ] || [ "${themeNumber}x" == "x" ]; then
-        Win_theme="Blue"
-    else
-        Win_theme="Graphite"
-    fi
+detect_window_manager() {
+  desktop_environment="Aqua"
+  window_manager="Quartz Compositor"
+
+  detect_window_manager_theme
 }
-# WindowsManager Theme Detection - END
 
-# Storage Detection - Begin
-function detect_storage() {
-    freeHumanStorage=$(diskutil info / | grep "Container Free Space" | awk '{print $5}')
-    totalHumanStorage=$(diskutil info / | grep "Disk Size" | awk '{print $4}')
-
-    freeStorage=$(diskutil info / | grep "Container Free Space" | awk '{print $4}')
-    totalStorage=$(diskutil info / | grep "Disk Size" | awk '{print $3}')
-    usedStorage=$(echo "$totalStorage - $freeStorage" | bc)
-    
-    percentageStorage=$(calculate_percentage ${usedStorage} ${totalStorage})
+detect_window_manager_theme() {
+  window_manager_theme="Not Found"
+  theme_identifier=$(defaults read NSGlobalDomain AppleAquaColorVariant 2>/dev/null)
+  if [ "$theme_identifier" -eq 1 ] || [ -z "$theme_identifier" ]; then
+      window_manager_theme="Blue"
+  else
+      window_manager_theme="Graphite"
+  fi
 }
-# Storage Detection - End
 
-# RAM Detection - Begin
-function detect_ram() {
-    pagesize=$(pagesize)
-    human=1024
-    human=$(($human * $human * $human))
-    humanRam="GB"
-    totalRam=$(echo "$(sysctl -n hw.memsize)"/${human}|bc)
+detect_storage() {
+  disk_util_info=$(diskutil info /)
+  free_storage_human=$(extract_value "$disk_util_info" "Container Free Space" 5)
+  total_storage_human=$(extract_value "$disk_util_info" "Disk Size" 4)
+  free_storage=$(extract_value "$disk_util_info" "Container Free Space" 4)
+  total_storage=$(extract_value "$disk_util_info" "Disk Size" 3)
 
-    pagesFree=$(vm_stat | grep ' free' | awk '{ print $3 }' | sed 's/\.//')
-    pagesActive=$(vm_stat | grep ' active' | awk '{ print $3 }' | sed 's/\.//')
-    pagesInactive=$(vm_stat | grep ' inactive' | awk '{ print $3 }' | sed 's/\.//')
-    pagesSpeculative=$(vm_stat | grep ' speculative' | awk '{ print $3 }' | sed 's/\.//')
-    pagesThrottled=$(vm_stat | grep ' throttled' | awk '{ print $3 }' | sed 's/\.//')
-    pagesWiredDown=$(vm_stat | grep wired | awk '{ print $4 }' | sed 's/\.//')
-    pagesPurgeable=$(vm_stat | grep ' purgeable' | awk '{ print $3 }' | sed 's/\.//')
-    usedRam=$(((${pagesFree} + ${pagesActive} + ${pagesInactive} + ${pagesSpeculative} + ${pagesThrottled}
-    + ${pagesWiredDown} + ${pagesPurgeable}) * ${pagesize} / $human))
-    
-    percentageRam=$(calculate_percentage ${usedRam} ${totalRam})
+  used_storage=$(echo "$total_storage - $free_storage" | bc)
 
+  storage_percentage=$(calculate_percentage "${used_storage}" "${total_storage}")
 }
-# RAM Detection - End
 
-# Calculate Percentage with two digits - Begin
+detect_cpu_gpu() {
+  cpu=$(sysctl -n machdep.cpu.brand_string)
+  gpu=$(system_profiler SPDisplaysDataType | awk -F': ' '/^\ *Chipset Model:/ {print $2}' | awk '{ printf "%s / ", $0 }' | sed -e 's/\/ $//g')
+}
+
+detect_ram() {
+  vm_stat=$(vm_stat)
+  page_size=$(pagesize)
+  human=1024
+  human_as_gb=$(echo "$human ^ 3" | bc)
+  human_ram="GB"
+
+  total_ram=$(echo "$(sysctl -n hw.memsize)"/"${human_as_gb}" | bc)
+  pages_free=$(extract_value "$vm_stat" ' free' 3 true)
+  pages_active=$(extract_value "$vm_stat" ' active' 3 true)
+  pages_inactive=$(extract_value "$vm_stat" ' inactive' 3 true)
+  pages_speculative=$(extract_value "$vm_stat" ' speculative' 3 true)
+  pages_throttled=$(extract_value "$vm_stat" ' throttled' 3 true)
+  pages_wired_down=$(extract_value "$vm_stat" ' wired down' 4 true)
+  pages_purgeable=$(extract_value "$vm_stat" ' purgeable' 3 true)
+
+  total_pages=$((pages_free + pages_active + pages_inactive + pages_speculative + pages_throttled + pages_wired_down + pages_purgeable))
+  used_ram_bytes=$((total_pages * page_size))
+  used_ram=$((used_ram_bytes / human_as_gb))
+
+  ram_percentage=$(calculate_percentage "${used_ram}" "${total_ram}")
+}
+
+extract_value() {
+  local output=$1
+  local pattern=$2
+  local field=$3
+  local remove_periods=${4:-false}  # Optional parameter to remove periods
+
+  local value=$(echo "$output" | grep "$pattern" | awk -v field=$field '{ print $field }')
+
+  if [ "$remove_periods" = true ]; then
+    value=$(echo "$value" | sed 's/\.//')
+  fi
+
+  echo "$value"
+}
+
 calculate_percentage() {
     local numerator=$1
     local denominator=$2
@@ -221,73 +222,70 @@ calculate_percentage() {
     # Format the result to two decimal places
     printf "%.2f\n" "$result"
 }
-# Calculate Percentage with two digits - End
 
+setup_colors() {
+  RED=$(tput setaf 1)
+  GREEN=$(tput setaf 2)
+  YELLOW=$(tput setaf 3)
+  BLUE=$(tput setaf 4)
+  PURPLE=$(tput setaf 5)
+  CIAN=$(tput setaf 6)
+  TEXT_COLOR=$CIAN
+  RESET=$(tput sgr0)
+}
 
-# System Variables
-user=$(whoami)
-hostname=$(hostname | sed 's/.local//g')
-detect_os_details
-detect_kernel_version
-detect_uptime
-detect_packages
-detect_shell
-terminal="$TERM ${TERM_PROGRAM//_/ }"
-detect_resolution
-DE="Aqua"
-WM="Quartz Compositor"
-detect_window_manager_theme
-detect_storage
-cpu=$(sysctl -n machdep.cpu.brand_string)
-gpu=$(system_profiler SPDisplaysDataType | awk -F': ' '/^\ *Chipset Model:/ {print $2}' | awk '{ printf "%s / ", $0 }' | sed -e 's/\/ $//g')
-detect_ram
+gather_system_info() {
+  user=$(whoami)
+  hostname=$(scutil --get LocalHostName)
+  detect_os_details
+  detect_kernel_version
+  detect_uptime
+  detect_packages
+  detect_shell
+  detect_resolution
+  detect_window_manager
+  detect_storage
+  detect_cpu_gpu
+  detect_ram
+}
 
-# removes (R) and (TM) from the CPU name so it fits in a standard 80 window
-cpu=$(echo "$cpu" | awk '$1=$1' | sed 's/([A-Z]\{1,2\})//g')
+build_info_with_colors() {
+  fields[${#fields[@]}]="${TEXT_COLOR}User:${RESET} ${user}@${hostname}${RESET}"
+  fields[${#fields[@]}]="${TEXT_COLOR}OS:${RESET} ${OS}${RESET}"
+  fields[${#fields[@]}]="${TEXT_COLOR}Kernel:${RESET} ${kernel}${RESET}"
+  fields[${#fields[@]}]="${TEXT_COLOR}Uptime:${RESET} ${uptime}${RESET}"
+  fields[${#fields[@]}]="${TEXT_COLOR}Packages:${RESET} ${packages}${RESET}"
+  fields[${#fields[@]}]="${TEXT_COLOR}Shell:${RESET} ${shell}${RESET}"
+  fields[${#fields[@]}]="${TEXT_COLOR}Terminal:${RESET} ${terminal}${RESET}"
+  fields[${#fields[@]}]="${TEXT_COLOR}Resolution:${RESET} ${resolution}${RESET}"
+  fields[${#fields[@]}]="${TEXT_COLOR}DE:${RESET} ${desktop_environment}${RESET}"
+  fields[${#fields[@]}]="${TEXT_COLOR}WM:${RESET} ${window_manager}, ${window_manager_theme}${RESET}"
+  fields[${#fields[@]}]="${TEXT_COLOR}CPU:${RESET} ${cpu}${RESET} ${PURPLE}| ${TEXT_COLOR}GPU:${RESET} ${gpu}${RESET}"
+  fields[${#fields[@]}]="${TEXT_COLOR}Storage:${RESET} ${storage_percentage}% (${used_storage} ${free_storage_human} ${BLUE}/${RESET} ${total_storage} ${total_storage_human})${RESET}"
+  fields[${#fields[@]}]="${TEXT_COLOR}RAM:${RESET} ${ram_percentage}% (${used_ram} ${human_ram} ${BLUE}/${RESET} ${total_ram} ${human_ram})${RESET}"
+}
 
+display_system_info() {
+  build_info_with_colors
 
-# Set up colors:
-
-RED=$(tput       setaf 1 2>/dev/null)
-GREEN=$(tput     setaf 2 2>/dev/null)
-YELLOW=$(tput    setaf 3 2>/dev/null)
-BLUE=$(tput      setaf 4 2>/dev/null)
-PURPLE=$(tput    setaf 5 2>/dev/null)
-textColor=$(tput setaf 6 2>/dev/null)
-normal=$(tput    sgr0 2>/dev/null)
-
-
-fieldlist[${#fieldlist[@]}]="${textColor}User:${normal} ${user}@${hostname}${normal}"
-fieldlist[${#fieldlist[@]}]="${textColor}OS:${normal} ${OS}${normal}"
-fieldlist[${#fieldlist[@]}]="${textColor}Kernel:${normal} ${kernel}${normal}"
-fieldlist[${#fieldlist[@]}]="${textColor}Uptime:${normal} ${uptime}${normal}"
-fieldlist[${#fieldlist[@]}]="${textColor}Packages:${normal} ${pkgs}${normal}"
-fieldlist[${#fieldlist[@]}]="${textColor}Shell:${normal} ${shell_type}${normal}"
-fieldlist[${#fieldlist[@]}]="${textColor}Terminal:${normal} ${terminal}${normal}"
-fieldlist[${#fieldlist[@]}]="${textColor}Resolution:${normal} ${xResolution}${normal}"
-fieldlist[${#fieldlist[@]}]="${textColor}DE:${normal} ${DE}${normal}"
-fieldlist[${#fieldlist[@]}]="${textColor}WM:${normal} ${WM}, ${Win_theme}${normal}"
-fieldlist[${#fieldlist[@]}]="${textColor}CPU:${normal} ${cpu}${normal} ${PURPLE}| ${textColor}GPU:${normal} ${gpu}${normal}"
-fieldlist[${#fieldlist[@]}]="${textColor}Storage:${normal} ${percentageStorage}% (${usedStorage} ${freeHumanStorage} ${BLUE}/${normal} ${totalStorage} ${totalHumanStorage})${normal}"
-fieldlist[${#fieldlist[@]}]="${textColor}RAM:${normal} ${percentageRam}% (${usedRam} ${humanRam} ${BLUE}/${normal} ${totalRam} ${humanRam})${normal}"
-
-
-# The ${foo#  } is a cheat so that it lines up here as well
-# as when run.
   echo -e "
-${GREEN#  }                                   ${fieldlist[0]}
-${GREEN#  }                                  ${fieldlist[1]}
-${GREEN#  }                                   ${fieldlist[2]}
-${GREEN#  }                        ${fieldlist[3]}
-${YELLOW# }                ${fieldlist[4]}
-${YELLOW# }                 ${fieldlist[5]}
-${RED#    }                  ${fieldlist[6]}
-${RED#    }                  ${fieldlist[7]}
-${RED#    }                 ${fieldlist[8]}
-${PURPLE# }                ${fieldlist[9]}
-${PURPLE# }                  ${fieldlist[10]}
-${BLUE#   }                      ${fieldlist[11]}
-${BLUE#   }                             ${fieldlist[12]}\
-${normal}
+${GREEN#  }                                   ${fields[0]}
+${GREEN#  }                                  ${fields[1]}
+${GREEN#  }                                   ${fields[2]}
+${GREEN#  }                        ${fields[3]}
+${YELLOW# }                ${fields[4]}
+${YELLOW# }                 ${fields[5]}
+${RED#    }                  ${fields[6]}
+${RED#    }                  ${fields[7]}
+${RED#    }                 ${fields[8]}
+${PURPLE# }                ${fields[9]}
+${PURPLE# }                  ${fields[10]}
+${BLUE#   }                      ${fields[11]}
+${BLUE#   }                             ${fields[12]}\
+${RESET}
 "
+}
 
+setup_colors
+gather_system_info
+display_system_info
