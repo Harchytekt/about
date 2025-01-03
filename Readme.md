@@ -14,7 +14,7 @@ This bash script lists the username, the OS and kernel versions, the used shell 
 _This script is inspired by [ScreenFetch](https://github.com/KittyKatt/screenFetch) and by [Archey](https://github.com/djmelik/archey)._
 
 [version-badge]: https://badgen.net/github/release/Harchytekt/learnIT/stable
-[version-url]: https://github.com/Harchytekt/about/tree/v1.0
+[version-url]: https://github.com/Harchytekt/about/tree/v2.0
 [platform-badge]: https://badgen.net/badge/icon/macOS?icon=apple&label
 [platform-url]: https://www.apple.com/macos/
 [type-badge]: https://badgen.net/badge/icon/terminal?icon=terminal&label
