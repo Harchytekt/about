@@ -157,9 +157,16 @@ detect_storage() {
   free_storage=$(extract_value "$disk_util_info" "Container Free Space" 4)
   total_storage=$(extract_value "$disk_util_info" "Disk Size" 3)
 
-  used_storage=$(echo "$total_storage - $free_storage" | bc)
+  if [[ "$free_storage_human" == "$total_storage_human" ]]; then
+    temp_total_storage=total_storage
+  else
+    # It seems the free storage is in GB and the total_storage is in TB
+    temp_total_storage=$(echo "$total_storage * $human" | bc)
+  fi
 
-  storage_percentage=$(calculate_percentage "${used_storage}" "${total_storage}")
+  used_storage=$(echo "$temp_total_storage - $free_storage" | bc)
+
+  storage_percentage=$(calculate_percentage "${used_storage}" "${temp_total_storage}")
 }
 
 detect_cpu_gpu() {
