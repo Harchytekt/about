@@ -260,9 +260,9 @@ build_info_with_colors() {
   fields[${#fields[@]}]="${TEXT_COLOR}Resolution:${RESET} ${resolution}${RESET}"
   fields[${#fields[@]}]="${TEXT_COLOR}DE:${RESET} ${desktop_environment}${RESET}"
   fields[${#fields[@]}]="${TEXT_COLOR}WM:${RESET} ${window_manager}, ${window_manager_theme}${RESET}"
-  fields[${#fields[@]}]="${TEXT_COLOR}CPU:${RESET} ${cpu}${RESET} ${PURPLE}| ${TEXT_COLOR}GPU:${RESET} ${gpu}${RESET}"
-  fields[${#fields[@]}]="${TEXT_COLOR}Storage:${RESET} ${storage_percentage}% (${used_storage} ${free_storage_human} ${BLUE}/${RESET} ${total_storage} ${total_storage_human})${RESET}"
-  fields[${#fields[@]}]="${TEXT_COLOR}RAM:${RESET} ${ram_percentage}% (${used_ram} ${human_ram} ${BLUE}/${RESET} ${total_ram} ${human_ram})${RESET}"
+  fields[${#fields[@]}]="${TEXT_COLOR}CPU:${RESET} ${cpu}${RESET}"
+  fields[${#fields[@]}]="${TEXT_COLOR}GPU:${RESET} ${gpu}${RESET}"
+  fields[${#fields[@]}]="${TEXT_COLOR}Storage:${RESET} ${storage_percentage}% (${used_storage} ${free_storage_human} ${BLUE}/${RESET} ${total_storage} ${total_storage_human}) ${PURPLE}| ${TEXT_COLOR}RAM:${RESET} ${ram_percentage}% (${used_ram} ${human_ram} ${BLUE}/${RESET} ${total_ram} ${human_ram})${RESET}"
 }
 
 display_system_info() {
