@@ -158,7 +158,7 @@ detect_storage() {
   total_storage=$(extract_value "$disk_util_info" "Disk Size" 3)
 
   if [[ "$free_storage_human" == "$total_storage_human" ]]; then
-    temp_total_storage=total_storage
+    temp_total_storage=$total_storage
   else
     # It seems the free storage is in GB and the total_storage is in TB
     temp_total_storage=$(echo "$total_storage * $human" | bc)
