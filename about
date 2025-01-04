@@ -238,6 +238,7 @@ setup_colors() {
 
 gather_system_info() {
   setup_variables
+
   user=$(whoami)
   hostname=$(scutil --get LocalHostName)
   detect_os_details
@@ -247,8 +248,8 @@ gather_system_info() {
   detect_shell
   detect_resolution
   detect_window_manager
-  detect_storage
   detect_cpu_gpu
+  detect_storage
   detect_ram
 }
 
