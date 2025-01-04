@@ -152,7 +152,6 @@ detect_window_manager_theme() {
 }
 
 detect_storage() {
-  disk_util_info=$(diskutil info /)
   free_storage_human=$(extract_value "$disk_util_info" "Container Free Space" 5)
   total_storage_human=$(extract_value "$disk_util_info" "Disk Size" 4)
   free_storage=$(extract_value "$disk_util_info" "Container Free Space" 4)
@@ -169,12 +168,6 @@ detect_cpu_gpu() {
 }
 
 detect_ram() {
-  vm_stat=$(vm_stat)
-  page_size=$(pagesize)
-  human=1024
-  human_as_gb=$(echo "$human ^ 3" | bc)
-  human_ram="GB"
-
   total_ram=$(echo "$(sysctl -n hw.memsize)"/"${human_as_gb}" | bc)
   pages_free=$(extract_value "$vm_stat" ' free' 3 true)
   pages_active=$(extract_value "$vm_stat" ' active' 3 true)
@@ -223,6 +216,15 @@ calculate_percentage() {
     printf "%.2f\n" "$result"
 }
 
+setup_variables() {
+  disk_util_info=$(diskutil info /)
+  vm_stat=$(vm_stat)
+  page_size=$(pagesize)
+  human=1024
+  human_as_gb=$(echo "$human ^ 3" | bc)
+  human_ram="GB"
+}
+
 setup_colors() {
   RED=$(tput setaf 1)
   GREEN=$(tput setaf 2)
@@ -235,6 +237,7 @@ setup_colors() {
 }
 
 gather_system_info() {
+  setup_variables
   user=$(whoami)
   hostname=$(scutil --get LocalHostName)
   detect_os_details
