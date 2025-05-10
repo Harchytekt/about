@@ -138,17 +138,30 @@ detect_window_manager() {
   desktop_environment="Aqua"
   window_manager="Quartz Compositor"
 
-  detect_window_manager_theme
+  detect_accent_color
 }
 
-detect_window_manager_theme() {
-  window_manager_theme="Not Found"
-  theme_identifier=$(defaults read NSGlobalDomain AppleAquaColorVariant 2>/dev/null)
-  if [ "$theme_identifier" -eq 1 ] || [ -z "$theme_identifier" ]; then
-      window_manager_theme="Blue"
+detect_accent_color() {
+  accent_color=$(defaults read -g AppleAccentColor 2>/dev/null)
+
+  if [[ "$accent_color" =~ ^-?[0-9]+$ ]]; then
+    case "$accent_color" in
+      -1) color="Multicolor (System Default)" ;;
+      0)  color="Graphite" ;;
+      1)  color="Red" ;;
+      2)  color="Orange" ;;
+      3)  color="Yellow" ;;
+      4)  color="Green" ;;
+      5)  color="Blue" ;;
+      6)  color="Purple" ;;
+      7)  color="Pink" ;;
+      *)  color="Unknown ($accent_color)" ;;
+    esac
   else
-      window_manager_theme="Graphite"
+    color="Multicolor (System Default)"
   fi
+
+  accent_color="$color"
 }
 
 detect_storage() {
@@ -274,7 +287,7 @@ build_info_with_colors() {
   fields[${#fields[@]}]="${TEXT_COLOR}Terminal:${RESET} ${terminal}${RESET}"
   fields[${#fields[@]}]="${TEXT_COLOR}Resolution:${RESET} ${resolution}${RESET}"
   fields[${#fields[@]}]="${TEXT_COLOR}DE:${RESET} ${desktop_environment}${RESET}"
-  fields[${#fields[@]}]="${TEXT_COLOR}WM:${RESET} ${window_manager}, ${window_manager_theme}${RESET}"
+  fields[${#fields[@]}]="${TEXT_COLOR}WM:${RESET} ${window_manager}, ${accent_color}${RESET}"
   fields[${#fields[@]}]="${TEXT_COLOR}CPU:${RESET} ${cpu}${RESET}"
   fields[${#fields[@]}]="${TEXT_COLOR}GPU:${RESET} ${gpu}${RESET}"
   fields[${#fields[@]}]="${TEXT_COLOR}Storage:${RESET} ${storage} ${PURPLE}| ${TEXT_COLOR}RAM:${RESET} ${ram}${RESET}"
